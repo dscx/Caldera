@@ -9,7 +9,7 @@ final class PreferencesStore: ObservableObject {
     private static let pollIntervalDefaultsKey = "TempBar.pollIntervalSeconds"
     private static let defaultAlertThresholdDefaultsKey = "TempBar.defaultAlertThresholdCelsius"
     private static let customAlertThresholdsDefaultsKey = "TempBar.customAlertThresholdsCelsius"
-    private static let collapsedSectionsDefaultsKey = "TempBar.collapsedSections"
+    private static let expandedSectionsDefaultsKey = "TempBar.expandedSections"
 
     static let pollIntervalRange: ClosedRange<Double> = 1...30
     static let defaultAlertThresholdCelsius: Double = 85
@@ -56,10 +56,11 @@ final class PreferencesStore: ObservableObject {
     }
 
     /// Section/subgroup labels (e.g. "Temperatures", "CPU", "TD") the user
-    /// has collapsed in the popover list.
-    @Published var collapsedSections: Set<String> {
+    /// has expanded in the popover list. Empty by default — every section
+    /// starts collapsed until the user opens it.
+    @Published var expandedSections: Set<String> {
         didSet {
-            UserDefaults.standard.set(Array(collapsedSections), forKey: Self.collapsedSectionsDefaultsKey)
+            UserDefaults.standard.set(Array(expandedSections), forKey: Self.expandedSectionsDefaultsKey)
         }
     }
 
@@ -83,8 +84,8 @@ final class PreferencesStore: ObservableObject {
 
         customAlertThresholds = UserDefaults.standard.dictionary(forKey: Self.customAlertThresholdsDefaultsKey) as? [String: Double] ?? [:]
 
-        let savedCollapsed = UserDefaults.standard.array(forKey: Self.collapsedSectionsDefaultsKey) as? [String]
-        collapsedSections = Set(savedCollapsed ?? [])
+        let savedExpanded = UserDefaults.standard.array(forKey: Self.expandedSectionsDefaultsKey) as? [String]
+        expandedSections = Set(savedExpanded ?? [])
     }
 
     func toggle(_ key: String) {
@@ -123,14 +124,32 @@ final class PreferencesStore: ObservableObject {
     }
 
     func isCollapsed(_ sectionKey: String) -> Bool {
-        collapsedSections.contains(sectionKey)
+        !expandedSections.contains(sectionKey)
     }
 
     func toggleCollapsed(_ sectionKey: String) {
-        if collapsedSections.contains(sectionKey) {
-            collapsedSections.remove(sectionKey)
+        if expandedSections.contains(sectionKey) {
+            expandedSections.remove(sectionKey)
         } else {
-            collapsedSections.insert(sectionKey)
+            expandedSections.insert(sectionKey)
+        }
+    }
+
+    func allVisible(_ keys: [String]) -> Bool {
+        !keys.isEmpty && keys.allSatisfy { visibleKeys.contains($0) }
+    }
+
+    func anyVisible(_ keys: [String]) -> Bool {
+        keys.contains { visibleKeys.contains($0) }
+    }
+
+    /// Bulk pin/unpin every sensor in a section or subgroup to the menu bar
+    /// at once, via the header checkbox.
+    func setVisible(_ visible: Bool, for keys: [String]) {
+        if visible {
+            visibleKeys.formUnion(keys)
+        } else {
+            visibleKeys.subtract(keys)
         }
     }
 }

@@ -7,6 +7,8 @@ import Combine
 /// the user's display-mode preference — plus a single shared popover (the
 /// detail/picker view) that opens below whichever status item was clicked.
 final class StatusBarController: NSObject {
+    private static let maxStatusItems = 20
+
     private let sensorStore: SensorStore
     private let preferences: PreferencesStore
     private var statusItems: [String: NSStatusItem] = [:]
@@ -67,7 +69,12 @@ final class StatusBarController: NSObject {
         displayMode: DisplayMode
     ) {
         let byKey = Dictionary(uniqueKeysWithValues: readings.map { ($0.key, $0) })
-        let visibleReadings = visibleKeys.sorted().compactMap { byKey[$0] }
+        // Defense in depth: regardless of how `visibleKeys` got this large
+        // (a bulk-select, a hand-edited defaults file, a future bug), never
+        // actually materialize more than a sane number of live status
+        // items — that's the difference between a cluttered menu bar and a
+        // frozen one.
+        let visibleReadings = visibleKeys.sorted().compactMap { byKey[$0] }.prefix(Self.maxStatusItems)
 
         switch displayMode {
         case .separate:

@@ -106,7 +106,7 @@ struct DetailView: View {
                     let items = sensorStore.readings.filter { $0.kind == kind }
                     if !items.isEmpty {
                         let sectionKey = kind.sectionTitle.uppercased()
-                        sectionHeader(sectionKey)
+                        sectionHeader(sectionKey, items: items)
                         if !preferences.isCollapsed(sectionKey) {
                             if kind == .temperature {
                                 // The temperature list can run into the hundreds
@@ -116,9 +116,10 @@ struct DetailView: View {
                                 // shared SMC key prefix (e.g. TD00, TD01, TD02…
                                 // together) rather than dumped into one flat list.
                                 ForEach(orderedSubgroups(of: items), id: \.self) { label in
-                                    subgroupHeader(label)
+                                    let subItems = items.filter { $0.temperatureGroupLabel == label }
+                                    subgroupHeader(label, items: subItems)
                                     if !preferences.isCollapsed(label) {
-                                        ForEach(items.filter { $0.temperatureGroupLabel == label }) { reading in
+                                        ForEach(subItems) { reading in
                                             sensorRow(reading)
                                         }
                                     }
@@ -146,46 +147,70 @@ struct DetailView: View {
         return known + unknown
     }
 
-    /// Section/subgroup headers double as collapse toggles — clicking one
-    /// hides its rows so a section the user doesn't care about (a mystery
-    /// cluster of raw keys, or a whole "Fans"/"Power" section) can be
-    /// tucked away instead of always eating scroll space.
-    private func sectionHeader(_ title: String) -> some View {
-        let collapsed = preferences.isCollapsed(title)
-        return Button(action: { preferences.toggleCollapsed(title) }) {
-            HStack(spacing: 4) {
-                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                Spacer()
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 2)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    /// Section/subgroup headers double as collapse toggles — clicking the
+    /// chevron/title hides the group's rows so a section the user doesn't
+    /// care about (a mystery cluster of raw keys, or a whole "Fans"/"Power"
+    /// section) can be tucked away instead of always eating scroll space.
+    /// The leading checkbox is a separate control: it pins/unpins every
+    /// sensor in the group to the menu bar at once, showing a dash when the
+    /// group is partially pinned.
+    private func sectionHeader(_ title: String, items: [SensorReading]) -> some View {
+        headerRow(title: title, items: items, indent: 12, titleSize: 10, chevronSize: 8, style: .secondary)
     }
 
-    private func subgroupHeader(_ label: String) -> some View {
-        let collapsed = preferences.isCollapsed(label)
-        return Button(action: { preferences.toggleCollapsed(label) }) {
-            HStack(spacing: 4) {
-                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 7, weight: .bold))
-                Text(label)
-                    .font(.system(size: 9, weight: .medium))
-                Spacer()
+    private func subgroupHeader(_ label: String, items: [SensorReading]) -> some View {
+        headerRow(title: label, items: items, indent: 20, titleSize: 9, chevronSize: 7, style: .tertiary)
+    }
+
+    /// A group larger than this doesn't get a bulk-select checkbox — pinning
+    /// dozens of sensors to the menu bar at once (e.g. all ~340 sensors
+    /// under the top-level "Temperatures" header) isn't a real use case,
+    /// just a footgun: it floods the menu bar with that many status items
+    /// and drives CPU with that many extra live-updating labels.
+    private static let bulkSelectLimit = 20
+
+    private func headerRow(
+        title: String,
+        items: [SensorReading],
+        indent: CGFloat,
+        titleSize: CGFloat,
+        chevronSize: CGFloat,
+        style: HierarchicalShapeStyle
+    ) -> some View {
+        let keys = items.map(\.key)
+        let collapsed = preferences.isCollapsed(title)
+        let allOn = preferences.allVisible(keys)
+        let anyOn = preferences.anyVisible(keys)
+
+        return HStack(spacing: 4) {
+            if keys.count <= Self.bulkSelectLimit {
+                Button(action: { preferences.setVisible(!allOn, for: keys) }) {
+                    Image(systemName: allOn ? "checkmark.square.fill" : (anyOn ? "minus.square.fill" : "square"))
+                        .font(.system(size: titleSize))
+                        .foregroundStyle(allOn || anyOn ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Color.clear.frame(width: titleSize, height: titleSize)
             }
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 20)
-            .padding(.top, 6)
-            .padding(.bottom, 1)
-            .contentShape(Rectangle())
+
+            Button(action: { preferences.toggleCollapsed(title) }) {
+                HStack(spacing: 4) {
+                    Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: chevronSize, weight: .bold))
+                    Text(title)
+                        .font(.system(size: titleSize, weight: .semibold))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(style)
+        .padding(.leading, indent)
+        .padding(.trailing, 12)
+        .padding(.top, indent == 12 ? 10 : 6)
+        .padding(.bottom, indent == 12 ? 2 : 1)
     }
 
     private func sensorRow(_ reading: SensorReading) -> some View {
