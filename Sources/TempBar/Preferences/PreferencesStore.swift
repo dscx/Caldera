@@ -14,6 +14,7 @@ final class PreferencesStore: ObservableObject {
     private static let hiddenKeysDefaultsKey = "TempBar.hiddenSensorKeys"
     private static let sectionOrderDefaultsKey = "TempBar.sectionOrder"
     private static let alertForAllSensorsDefaultsKey = "TempBar.alertForAllSensors"
+    private static let averageGroupsDefaultsKey = "TempBar.averageGroupsInMenuBar"
 
     static let pollIntervalRange: ClosedRange<Double> = 1...30
     static let defaultAlertThresholdCelsius: Double = 85
@@ -103,6 +104,15 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// Off by default. When on, the menu bar shows one averaged entry per
+    /// hardware-area group (all pinned CPU sensors collapse into a single
+    /// "cpu 62°C" entry, etc.) instead of one entry per pinned sensor.
+    @Published var averageGroupsInMenuBar: Bool {
+        didSet {
+            UserDefaults.standard.set(averageGroupsInMenuBar, forKey: Self.averageGroupsDefaultsKey)
+        }
+    }
+
     init() {
         let saved = UserDefaults.standard.array(forKey: Self.visibleKeysDefaultsKey) as? [String]
         visibleKeys = Set(saved ?? [])
@@ -141,6 +151,7 @@ final class PreferencesStore: ObservableObject {
         sectionOrder = resolvedOrder.filter { Self.defaultSectionOrder.contains($0) } + knownRemaining
 
         alertForAllSensors = UserDefaults.standard.bool(forKey: Self.alertForAllSensorsDefaultsKey)
+        averageGroupsInMenuBar = UserDefaults.standard.bool(forKey: Self.averageGroupsDefaultsKey)
     }
 
     func toggle(_ key: String) {

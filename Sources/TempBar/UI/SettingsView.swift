@@ -34,6 +34,7 @@ struct SettingsView: View {
                     set: { LaunchAtLogin.setEnabled($0) }
                 ))
                 Toggle("Alert on any sensor, not just pinned", isOn: $preferences.alertForAllSensors)
+                Toggle("Average each group in the menu bar", isOn: $preferences.averageGroupsInMenuBar)
             }
 
             Section("Sections") {

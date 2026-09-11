@@ -25,6 +25,18 @@ enum MetricKind: String, CaseIterable {
         }
     }
 
+    /// SF Symbol for an *averaged* Fans/Power entry (see
+    /// PreferencesStore.averageGroupsInMenuBar). Temperature doesn't use
+    /// this — its averaged entries are per hardware-area group instead, via
+    /// SensorCategory.averagedSymbolName.
+    var averagedSymbolName: String {
+        switch self {
+        case .temperature: return "thermometer"
+        case .fan: return "fanblades.fill"
+        case .power: return "bolt.fill"
+        }
+    }
+
     func formatted(_ rawValue: Double, unit: TemperatureUnit, precise: Bool) -> String {
         switch self {
         case .temperature:

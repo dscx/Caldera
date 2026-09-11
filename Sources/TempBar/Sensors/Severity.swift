@@ -15,6 +15,17 @@ enum Severity {
         case .hot: return .systemRed
         }
     }
+
+    /// Higher = more severe. Used to pick the worst severity among a group
+    /// of sensors collapsed into one averaged menu bar entry, so one hot
+    /// outlier still reads as hot even if it's not dragging the average up.
+    var rank: Int {
+        switch self {
+        case .normal: return 0
+        case .warm: return 1
+        case .hot: return 2
+        }
+    }
 }
 
 func severity(forCelsius celsius: Double, hotThreshold: Double) -> Severity {

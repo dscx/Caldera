@@ -7,7 +7,7 @@ enum SensorCategory: String, CaseIterable {
     case system = "System"
     case other = "Other"
 
-    /// The "icon" half of the menu bar's "icon::value" display.
+    /// The "icon" half of the menu bar's "icon <value>" display.
     var icon: String {
         switch self {
         case .cpu: return "💻"
@@ -15,6 +15,22 @@ enum SensorCategory: String, CaseIterable {
         case .battery: return "🔋"
         case .system: return "🖥️"
         case .other: return "🌡️"
+        }
+    }
+
+    /// SF Symbol used only for an *averaged* group entry (see
+    /// PreferencesStore.averageGroupsInMenuBar) — a deliberately distinct,
+    /// monochrome glyph so an averaged reading is visually distinguishable
+    /// at a glance from a single sensor's own emoji icon. Names verified to
+    /// exist against this SDK (NSImage(systemSymbolName:)) before use — SF
+    /// Symbols has no "gpu" glyph, hence the grid-of-cores stand-in.
+    var averagedSymbolName: String {
+        switch self {
+        case .cpu: return "cpu"
+        case .gpu: return "square.grid.3x3.fill"
+        case .battery: return "battery.100percent"
+        case .system: return "desktopcomputer"
+        case .other: return "thermometer"
         }
     }
 }
