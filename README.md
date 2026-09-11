@@ -33,6 +33,14 @@ overhead.
 - Apple Silicon Mac, macOS 13+
 - Xcode command line tools (`xcode-select --install`)
 
+## Download
+
+Grab `Caldera.app.zip` from the [latest release](https://github.com/dscx/Caldera/releases/latest), unzip it, and move `Caldera.app` wherever you like.
+
+It's ad-hoc signed only (no Apple Developer ID, not notarized), so macOS
+blocks a plain double-click on first launch. Right-click (or Control-click)
+`Caldera.app` → **Open** → **Open** in the dialog instead — only needed once.
+
 ## Build & run
 
 ```bash
@@ -41,9 +49,8 @@ open Caldera.app
 ```
 
 `build.sh` compiles a release binary via Swift Package Manager and assembles
-`Caldera.app`. The app isn't sandboxed (SMC access requires that) and is only
-ad-hoc code signed, so it's meant to be built and run locally rather than
-distributed as a signed binary.
+`Caldera.app`. The app isn't sandboxed (SMC access requires that), so it
+can't go through the Mac App Store.
 
 ## License
 

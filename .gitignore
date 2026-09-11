@@ -1,3 +1,4 @@
 .build/
 Caldera.app/
+*.zip
 .DS_Store
