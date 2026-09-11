@@ -1,4 +1,4 @@
-# Caldera
+<h1><img src="docs/icon.png" width="36" align="center" alt=""> Caldera</h1>
 
 A native macOS menu bar app that reads temperature, fan, and power sensors
 directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
@@ -38,8 +38,18 @@ overhead.
 Grab `Caldera.app.zip` from the [latest release](https://github.com/dscx/Caldera/releases/latest), unzip it, and move `Caldera.app` wherever you like.
 
 It's ad-hoc signed only (no Apple Developer ID, not notarized), so macOS
-blocks a plain double-click on first launch. Right-click (or Control-click)
-`Caldera.app` → **Open** → **Open** in the dialog instead — only needed once.
+blocks it on first launch — and on current macOS, the dialog you get from
+double-clicking or right-click → Open only offers **Move to Trash** or
+**Done**, with no direct bypass. To actually open it, use one of:
+
+- **System Settings:** try to open the app once (so macOS registers the
+  block), then go to **System Settings → Privacy & Security**, scroll to
+  the security message about `Caldera.app`, and click **Open Anyway**.
+  Confirm once more when it re-launches. Only needed the first time.
+- **Terminal:** strip the quarantine flag yourself, then open it normally:
+  ```bash
+  xattr -d com.apple.quarantine /path/to/Caldera.app
+  ```
 
 ## Build & run
 
