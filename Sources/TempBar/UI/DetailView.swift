@@ -1,0 +1,346 @@
+import SwiftUI
+
+/// The popover content: every discovered sensor, grouped by category, with
+/// a checkbox to pin each one to the menu bar. This doubles as the detail
+/// view and the visibility/settings picker — there's nothing a separate
+/// settings screen would add here.
+struct DetailView: View {
+    @ObservedObject var sensorStore: SensorStore
+    @ObservedObject var preferences: PreferencesStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            settingsRow
+            Divider()
+            content
+            Divider()
+            footer
+        }
+        .frame(width: 340, height: 480)
+    }
+
+    private var header: some View {
+        HStack {
+            Text("Sensors")
+                .font(.headline)
+            Spacer()
+            Text("\(preferences.visibleKeys.count) in menu bar")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            unitPicker
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+    }
+
+    private var unitPicker: some View {
+        Picker("", selection: $preferences.temperatureUnit) {
+            Text("°C").tag(TemperatureUnit.celsius)
+            Text("°F").tag(TemperatureUnit.fahrenheit)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 84)
+    }
+
+    private var settingsRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Menu bar:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $preferences.displayMode) {
+                    Text("Separate").tag(DisplayMode.separate)
+                    Text("Combined").tag(DisplayMode.combined)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 160)
+            }
+            HStack(spacing: 10) {
+                Stepper(
+                    "Refresh: \(Int(preferences.pollIntervalSeconds))s",
+                    value: $preferences.pollIntervalSeconds,
+                    in: PreferencesStore.pollIntervalRange,
+                    step: 1
+                )
+                .font(.caption)
+                Spacer()
+                Stepper(
+                    "Default alert ≥ \(Int(preferences.defaultAlertThreshold))°C",
+                    value: $preferences.defaultAlertThreshold,
+                    in: PreferencesStore.alertThresholdRange,
+                    step: 5
+                )
+                .font(.caption)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if sensorStore.isScanning {
+            ProgressView("Scanning sensors…")
+                .padding(24)
+                .frame(maxWidth: .infinity)
+        } else if sensorStore.readings.isEmpty {
+            Text(sensorStore.errorMessage ?? "No sensors found.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(24)
+                .frame(maxWidth: .infinity)
+        } else {
+            sensorList
+        }
+    }
+
+    private var sensorList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(MetricKind.allCases, id: \.self) { kind in
+                    let items = sensorStore.readings.filter { $0.kind == kind }
+                    if !items.isEmpty {
+                        let sectionKey = kind.sectionTitle.uppercased()
+                        sectionHeader(sectionKey)
+                        if !preferences.isCollapsed(sectionKey) {
+                            if kind == .temperature {
+                                // The temperature list can run into the hundreds
+                                // of sensors, so it gets a second grouping level:
+                                // known hardware areas first, then any sensors
+                                // without a curated name clustered by their
+                                // shared SMC key prefix (e.g. TD00, TD01, TD02…
+                                // together) rather than dumped into one flat list.
+                                ForEach(orderedSubgroups(of: items), id: \.self) { label in
+                                    subgroupHeader(label)
+                                    if !preferences.isCollapsed(label) {
+                                        ForEach(items.filter { $0.temperatureGroupLabel == label }) { reading in
+                                            sensorRow(reading)
+                                        }
+                                    }
+                                }
+                            } else {
+                                ForEach(items) { reading in
+                                    sensorRow(reading)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    /// Known hardware areas first (in a fixed, sensible order), then any
+    /// prefix-derived clusters for unrecognized sensors, alphabetically.
+    private func orderedSubgroups(of items: [SensorReading]) -> [String] {
+        let priority = ["CPU", "GPU", "Battery", "System"]
+        let present = Set(items.map(\.temperatureGroupLabel))
+        let known = priority.filter { present.contains($0) }
+        let unknown = present.subtracting(priority).sorted()
+        return known + unknown
+    }
+
+    /// Section/subgroup headers double as collapse toggles — clicking one
+    /// hides its rows so a section the user doesn't care about (a mystery
+    /// cluster of raw keys, or a whole "Fans"/"Power" section) can be
+    /// tucked away instead of always eating scroll space.
+    private func sectionHeader(_ title: String) -> some View {
+        let collapsed = preferences.isCollapsed(title)
+        return Button(action: { preferences.toggleCollapsed(title) }) {
+            HStack(spacing: 4) {
+                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func subgroupHeader(_ label: String) -> some View {
+        let collapsed = preferences.isCollapsed(label)
+        return Button(action: { preferences.toggleCollapsed(label) }) {
+            HStack(spacing: 4) {
+                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))
+                Spacer()
+            }
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 20)
+            .padding(.top, 6)
+            .padding(.bottom, 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sensorRow(_ reading: SensorReading) -> some View {
+        SensorRow(
+            reading: reading,
+            unit: preferences.temperatureUnit,
+            threshold: preferences.alertThreshold(for: reading.key),
+            hasCustomThreshold: preferences.hasCustomAlertThreshold(for: reading.key),
+            history: sensorStore.history[reading.key] ?? [],
+            isVisible: preferences.visibleKeys.contains(reading.key),
+            onToggle: { preferences.toggle(reading.key) },
+            onThresholdChange: { newValue in
+                let clamped = min(max(newValue, PreferencesStore.alertThresholdRange.lowerBound), PreferencesStore.alertThresholdRange.upperBound)
+                preferences.setCustomAlertThreshold(clamped, for: reading.key)
+            },
+            onThresholdReset: { preferences.resetAlertThreshold(for: reading.key) }
+        )
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Check a sensor to pin it to the menu bar")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            HStack {
+                Toggle("Launch at login", isOn: Binding(
+                    get: { LaunchAtLogin.isEnabled },
+                    set: { LaunchAtLogin.setEnabled($0) }
+                ))
+                .toggleStyle(.checkbox)
+                .font(.caption)
+                Spacer()
+                Button("Quit") {
+                    NSApplication.shared.terminate(nil)
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+            }
+        }
+        .padding(10)
+    }
+}
+
+private struct SensorRow: View {
+    let reading: SensorReading
+    let unit: TemperatureUnit
+    let threshold: Double
+    let hasCustomThreshold: Bool
+    let history: [Double]
+    let isVisible: Bool
+    let onToggle: () -> Void
+    let onThresholdChange: (Double) -> Void
+    let onThresholdReset: () -> Void
+
+    private var currentSeverity: Severity {
+        severity(for: reading, hotThresholdCelsius: threshold)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // The threshold +/- controls below need their own tap targets,
+            // so only checkbox/icon/name/value are inside the toggle button
+            // — nesting a Button inside a Button makes the inner one
+            // unreachable on macOS.
+            Button(action: onToggle) {
+                HStack(spacing: 8) {
+                    Image(systemName: isVisible ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(isVisible ? Color.accentColor : Color.secondary)
+                    Text(reading.icon)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(reading.name)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary)
+                        if reading.name != reading.key {
+                            Text(reading.key)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if history.count > 1 {
+                        Sparkline(values: history, color: Color(currentSeverity.nsColor))
+                            .frame(width: 36, height: 14)
+                    }
+                    Text(reading.formattedPrecise(unit: unit))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Color(currentSeverity.nsColor))
+                        .frame(width: 56, alignment: .trailing)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isVisible && reading.kind == .temperature {
+                thresholdControl
+                    .padding(.leading, 40)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
+
+    private var thresholdControl: some View {
+        HStack(spacing: 4) {
+            Text(hasCustomThreshold ? "Alert ≥ \(Int(threshold))°C" : "Alert ≥ \(Int(threshold))°C (default)")
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+            Button(action: { onThresholdChange(threshold - 5) }) {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 9))
+            Button(action: { onThresholdChange(threshold + 5) }) {
+                Image(systemName: "plus.circle")
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 9))
+            if hasCustomThreshold {
+                Button(action: onThresholdReset) {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 9))
+            }
+        }
+    }
+}
+
+/// A minimal min/max-normalized line graph of recent values — just enough
+/// to show "trending up/down/flat" at a glance in a 36x14pt row accessory.
+private struct Sparkline: View {
+    let values: [Double]
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            Path { path in
+                guard values.count > 1 else { return }
+                let minValue = values.min() ?? 0
+                let maxValue = values.max() ?? 1
+                let range = max(maxValue - minValue, 0.001)
+                let stepX = geo.size.width / CGFloat(values.count - 1)
+
+                for (index, value) in values.enumerated() {
+                    let x = CGFloat(index) * stepX
+                    let normalized = (value - minValue) / range
+                    let y = geo.size.height * (1 - CGFloat(normalized))
+                    if index == 0 {
+                        path.move(to: CGPoint(x: x, y: y))
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    }
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
