@@ -12,11 +12,15 @@ struct DetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            if !sensorStore.topProcesses.isEmpty {
-                hotProcessesBanner
-            }
             Divider()
             content
+            // Anchored above the footer, not the header, so it doesn't push
+            // the sensor list around every time it appears/disappears — only
+            // this bottom strip changes size.
+            if !sensorStore.topProcesses.isEmpty {
+                Divider()
+                hotProcessesBanner
+            }
             Divider()
             footer
         }
