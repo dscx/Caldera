@@ -1,18 +1,13 @@
-<table><tr>
-<td><img src="docs/icon.png" width="96" alt=""></td>
-<td valign="middle"><h1>Caldera</h1></td>
-</tr></table>
+<h1><img src="docs/icon.png" width="96" align="middle" alt=""> Caldera</h1>
 
 A native macOS menu bar app that reads temperature, fan, and power sensors
 directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
 overhead.
 
-<table align="center">
-  <tr>
-    <td><img src="docs/main.png" width="290" alt="Caldera's sensor popover, showing pinned CPU and fan sensors with sparklines and top CPU processes"></td>
-    <td><img src="docs/settings.png" width="290" alt="Caldera's Settings window, showing general preferences and section management"></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/main.png" width="290" alt="Caldera's sensor popover, showing pinned CPU and fan sensors with sparklines and top CPU processes">
+  <img src="docs/settings.png" width="290" alt="Caldera's Settings window, showing general preferences and section management">
+</p>
 
 ## Features
 
