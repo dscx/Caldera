@@ -17,7 +17,7 @@ final class SensorStore: ObservableObject {
     @Published private(set) var topProcesses: [ProcessCPUUsage] = []
 
     private let smc = SMC()
-    private let queue = DispatchQueue(label: "com.dscx.tempbar.smc")
+    private let queue = DispatchQueue(label: "com.dscx.caldera.smc")
     private var sensors: [DiscoveredSensor] = []
     /// CPU-category keys without a curated name get a stable "CPU Sensor N"
     /// label, computed once from the full discovered set so numbering

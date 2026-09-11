@@ -1,4 +1,4 @@
-# TempBar
+# Caldera
 
 A native macOS menu bar app that reads temperature, fan, and power sensors
 directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
@@ -30,11 +30,11 @@ overhead.
 
 ```bash
 ./build.sh
-open TempBar.app
+open Caldera.app
 ```
 
 `build.sh` compiles a release binary via Swift Package Manager and assembles
-`TempBar.app`. The app isn't sandboxed (SMC access requires that) and is only
+`Caldera.app`. The app isn't sandboxed (SMC access requires that) and is only
 ad-hoc code signed, so it's meant to be built and run locally rather than
 distributed as a signed binary.
 

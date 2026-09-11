@@ -14,7 +14,7 @@ enum AlertNotifier {
 
     static func fireHotAlert(sensorName: String, valueText: String) {
         let content = UNMutableNotificationContent()
-        content.title = "TempBar"
+        content.title = "Caldera"
         content.body = "\(sensorName) is running hot: \(valueText)"
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)

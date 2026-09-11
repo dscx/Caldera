@@ -2,19 +2,19 @@ import Foundation
 
 /// Persists which sensor keys the user has chosen to pin to the menu bar.
 final class PreferencesStore: ObservableObject {
-    private static let visibleKeysDefaultsKey = "TempBar.visibleSensorKeys"
-    private static let hasChosenDefaultDefaultsKey = "TempBar.hasChosenDefault"
-    private static let temperatureUnitDefaultsKey = "TempBar.temperatureUnit"
-    private static let displayModeDefaultsKey = "TempBar.displayMode"
-    private static let pollIntervalDefaultsKey = "TempBar.pollIntervalSeconds"
-    private static let defaultAlertThresholdDefaultsKey = "TempBar.defaultAlertThresholdCelsius"
-    private static let customAlertThresholdsDefaultsKey = "TempBar.customAlertThresholdsCelsius"
-    private static let expandedSectionsDefaultsKey = "TempBar.expandedSections"
-    private static let hiddenSectionLabelsDefaultsKey = "TempBar.hiddenSectionLabels"
-    private static let hiddenKeysDefaultsKey = "TempBar.hiddenSensorKeys"
-    private static let sectionOrderDefaultsKey = "TempBar.sectionOrder"
-    private static let alertForAllSensorsDefaultsKey = "TempBar.alertForAllSensors"
-    private static let averageGroupsDefaultsKey = "TempBar.averageGroupsInMenuBar"
+    private static let visibleKeysDefaultsKey = "Caldera.visibleSensorKeys"
+    private static let hasChosenDefaultDefaultsKey = "Caldera.hasChosenDefault"
+    private static let temperatureUnitDefaultsKey = "Caldera.temperatureUnit"
+    private static let displayModeDefaultsKey = "Caldera.displayMode"
+    private static let pollIntervalDefaultsKey = "Caldera.pollIntervalSeconds"
+    private static let defaultAlertThresholdDefaultsKey = "Caldera.defaultAlertThresholdCelsius"
+    private static let customAlertThresholdsDefaultsKey = "Caldera.customAlertThresholdsCelsius"
+    private static let expandedSectionsDefaultsKey = "Caldera.expandedSections"
+    private static let hiddenSectionLabelsDefaultsKey = "Caldera.hiddenSectionLabels"
+    private static let hiddenKeysDefaultsKey = "Caldera.hiddenSensorKeys"
+    private static let sectionOrderDefaultsKey = "Caldera.sectionOrder"
+    private static let alertForAllSensorsDefaultsKey = "Caldera.alertForAllSensors"
+    private static let averageGroupsDefaultsKey = "Caldera.averageGroupsInMenuBar"
 
     static let pollIntervalRange: ClosedRange<Double> = 1...30
     static let defaultAlertThresholdCelsius: Double = 85

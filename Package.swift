@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "TempBar",
+    name: "Caldera",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "TempBar",
-            path: "Sources/TempBar"
+            name: "Caldera",
+            path: "Sources/Caldera"
         )
     ]
 )

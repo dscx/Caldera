@@ -23,7 +23,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         let hosting = NSHostingController(rootView: SettingsView(sensorStore: sensorStore, preferences: preferences))
         let newWindow = NSWindow(contentViewController: hosting)
-        newWindow.title = "TempBar Settings"
+        newWindow.title = "Caldera Settings"
         newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         newWindow.setContentSize(NSSize(width: 380, height: 520))
         newWindow.minSize = NSSize(width: 320, height: 360)

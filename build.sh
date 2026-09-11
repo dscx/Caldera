@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 swift build -c release
 
-APP_NAME="TempBar"
+APP_NAME="Caldera"
 APP_BUNDLE="$APP_NAME.app"
 BIN_PATH=".build/release/$APP_NAME"
 
