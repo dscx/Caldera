@@ -5,6 +5,10 @@ directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
 overhead.
 
 <p align="center">
+  <img src="docs/menubar.png" height="48" alt="Caldera's menu bar item, showing a pinned CPU temperature and fan speed separated by a middle dot">
+</p>
+
+<p align="center">
   <img src="docs/main.png" height="400" alt="Caldera's sensor popover, showing pinned CPU and fan sensors with sparklines and top CPU processes">
   <img src="docs/settings.png" height="400" alt="Caldera's Settings window, showing general preferences and section management">
 </p>
