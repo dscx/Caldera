@@ -3,9 +3,11 @@ import SwiftUI
 import Combine
 
 /// Owns the menu bar status item(s) for pinned sensors — either one item per
-/// sensor ("<icon>::<value>" each) or a single combined item, depending on
-/// the user's display-mode preference — plus a single shared popover (the
-/// detail/picker view) that opens below whichever status item was clicked.
+/// sensor ("<icon> <value>" each) or a single combined item with "::" joining
+/// each sensor's "<icon> <value>" ("<icon> <value>::<icon> <value>"),
+/// depending on the user's display-mode preference — plus a single shared
+/// popover (the detail/picker view) that opens below whichever status item
+/// was clicked.
 final class StatusBarController: NSObject {
     private static let maxStatusItems = 20
 
@@ -107,12 +109,12 @@ final class StatusBarController: NSObject {
             let item = combinedStatusItem ?? makeStatusItem()
             combinedStatusItem = item
             if visibleReadings.isEmpty {
-                item.button?.attributedTitle = NSAttributedString(string: "🌡️::--")
+                item.button?.attributedTitle = NSAttributedString(string: "🌡️ --")
             } else {
                 let combined = NSMutableAttributedString()
                 for (index, reading) in visibleReadings.enumerated() {
                     if index > 0 {
-                        combined.append(NSAttributedString(string: "  "))
+                        combined.append(NSAttributedString(string: "::"))
                     }
                     combined.append(segment(for: reading, unit: unit))
                 }
@@ -121,11 +123,13 @@ final class StatusBarController: NSObject {
         }
     }
 
+    /// "<icon> <value>" — the "::" that separates sensors in combined mode
+    /// is added between segments by the caller, not here.
     private func segment(for reading: SensorReading, unit: TemperatureUnit) -> NSAttributedString {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
         let hotThreshold = preferences.alertThreshold(for: reading.key)
         let color = severity(for: reading, hotThresholdCelsius: hotThreshold).nsColor
-        let text = "\(reading.icon)::\(reading.formattedShort(unit: unit))"
+        let text = "\(reading.icon) \(reading.formattedShort(unit: unit))"
         return NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
     }
 

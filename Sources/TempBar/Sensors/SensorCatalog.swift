@@ -76,4 +76,22 @@ enum SensorCatalog {
         if let known = knownSensors[key] { return known.category }
         return inferredCategoryByPrefix[String(key.prefix(2))] ?? .other
     }
+
+    /// For CPU-category keys that aren't individually curated above: Apple's
+    /// own SMC key scheme has no fixed meaning across Mac models — confirmed
+    /// via the Linux kernel's Apple Silicon SMC driver discussion, which
+    /// describes the FourCC keys as "almost random" between devices, with no
+    /// way to enumerate or deduce which physical core/component one measures.
+    /// Inventing a specific name (e.g. "P-core 3") would just be a confident
+    /// guess that could be flat wrong. A stable "CPU Sensor N" — numbered by
+    /// sorted key, so it stays the same across launches on this Mac — is
+    /// more approachable than a raw 4-character code without overclaiming.
+    static func assignDescriptiveNames(for keys: [String]) -> [String: String] {
+        let uncuratedCPUKeys = keys.filter { knownSensors[$0] == nil && category(for: $0) == .cpu }.sorted()
+        var result: [String: String] = [:]
+        for (index, key) in uncuratedCPUKeys.enumerated() {
+            result[key] = "CPU Sensor \(index + 1)"
+        }
+        return result
+    }
 }

@@ -19,6 +19,10 @@ final class SensorStore: ObservableObject {
     private let smc = SMC()
     private let queue = DispatchQueue(label: "com.dscx.tempbar.smc")
     private var sensors: [DiscoveredSensor] = []
+    /// CPU-category keys without a curated name get a stable "CPU Sensor N"
+    /// label, computed once from the full discovered set so numbering
+    /// doesn't shift if one sensor briefly fails to decode on a given poll.
+    private var assignedNames: [String: String] = [:]
     private var timer: Timer?
     private var intervalCancellable: AnyCancellable?
     private var preferences: PreferencesStore?
@@ -58,6 +62,7 @@ final class SensorStore: ObservableObject {
 
         let discovered = discoverSensors(smc: smc)
         sensors = discovered
+        assignedNames = SensorCatalog.assignDescriptiveNames(for: discovered.map(\.key))
 
         if discovered.isEmpty {
             publish(isScanning: false, errorMessage: "No sensors were found on this Mac.")
@@ -93,7 +98,7 @@ final class SensorStore: ObservableObject {
             updated.append(
                 SensorReading(
                     key: sensor.key,
-                    name: SensorCatalog.name(for: sensor.key),
+                    name: assignedNames[sensor.key] ?? SensorCatalog.name(for: sensor.key),
                     category: SensorCatalog.category(for: sensor.key),
                     kind: sensor.kind,
                     rawValue: value

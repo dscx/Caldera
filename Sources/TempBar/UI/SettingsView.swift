@@ -9,6 +9,33 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            Section("General") {
+                Picker("Temperature unit", selection: $preferences.temperatureUnit) {
+                    Text("Celsius").tag(TemperatureUnit.celsius)
+                    Text("Fahrenheit").tag(TemperatureUnit.fahrenheit)
+                }
+                Picker("Menu bar display", selection: $preferences.displayMode) {
+                    Text("Separate items").tag(DisplayMode.separate)
+                    Text("Combined item").tag(DisplayMode.combined)
+                }
+                Stepper(
+                    "Refresh every \(Int(preferences.pollIntervalSeconds))s",
+                    value: $preferences.pollIntervalSeconds,
+                    in: PreferencesStore.pollIntervalRange
+                )
+                Stepper(
+                    "Default alert \u{2265} \(Int(preferences.defaultAlertThreshold))\u{00B0}C",
+                    value: $preferences.defaultAlertThreshold,
+                    in: PreferencesStore.alertThresholdRange,
+                    step: 5
+                )
+                Toggle("Launch at login", isOn: Binding(
+                    get: { LaunchAtLogin.isEnabled },
+                    set: { LaunchAtLogin.setEnabled($0) }
+                ))
+                Toggle("Alert on any sensor, not just pinned", isOn: $preferences.alertForAllSensors)
+            }
+
             Section("Sections") {
                 ForEach(preferences.sectionOrder.indices, id: \.self) { index in
                     let label = preferences.sectionOrder[index]
@@ -46,32 +73,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("General") {
-                Picker("Temperature unit", selection: $preferences.temperatureUnit) {
-                    Text("Celsius").tag(TemperatureUnit.celsius)
-                    Text("Fahrenheit").tag(TemperatureUnit.fahrenheit)
-                }
-                Picker("Menu bar display", selection: $preferences.displayMode) {
-                    Text("Separate items").tag(DisplayMode.separate)
-                    Text("Combined item").tag(DisplayMode.combined)
-                }
-                Stepper(
-                    "Refresh every \(Int(preferences.pollIntervalSeconds))s",
-                    value: $preferences.pollIntervalSeconds,
-                    in: PreferencesStore.pollIntervalRange
-                )
-                Stepper(
-                    "Default alert \u{2265} \(Int(preferences.defaultAlertThreshold))\u{00B0}C",
-                    value: $preferences.defaultAlertThreshold,
-                    in: PreferencesStore.alertThresholdRange,
-                    step: 5
-                )
-                Toggle("Launch at login", isOn: Binding(
-                    get: { LaunchAtLogin.isEnabled },
-                    set: { LaunchAtLogin.setEnabled($0) }
-                ))
-                Toggle("Alert on any sensor, not just pinned", isOn: $preferences.alertForAllSensors)
-            }
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .frame(minWidth: 340, minHeight: 420)
