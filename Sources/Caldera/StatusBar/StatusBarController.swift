@@ -3,11 +3,11 @@ import SwiftUI
 import Combine
 
 /// Owns the menu bar status item(s) for pinned sensors — either one item per
-/// sensor ("<icon> <value>" each) or a single combined item with "::" joining
-/// each sensor's "<icon> <value>" ("<icon> <value>::<icon> <value>"),
-/// depending on the user's display-mode preference — plus a single shared
-/// popover (the detail/picker view) that opens below whichever status item
-/// was clicked.
+/// sensor ("<icon> <value>" each) or a single combined item with a middle
+/// dot joining each sensor's "<icon> <value>" ("<icon> <value> · <icon>
+/// <value>"), depending on the user's display-mode preference — plus a
+/// single shared popover (the detail/picker view) that opens below
+/// whichever status item was clicked.
 final class StatusBarController: NSObject {
     private static let maxStatusItems = 20
 
@@ -122,7 +122,7 @@ final class StatusBarController: NSObject {
                 let combined = NSMutableAttributedString()
                 for (index, entry) in entries.enumerated() {
                     if index > 0 {
-                        combined.append(NSAttributedString(string: "::"))
+                        combined.append(entrySeparator)
                     }
                     combined.append(attributedText(for: entry))
                 }
@@ -131,8 +131,8 @@ final class StatusBarController: NSObject {
         }
     }
 
-    /// "<icon> <value>" — the "::" that separates entries in combined mode
-    /// is added between segments by the caller, not here. An SF Symbol icon
+    /// "<icon> <value>" — the middle-dot separator between entries in
+    /// combined mode is added by the caller, not here. An SF Symbol icon
     /// (averaged entries only) renders as a template image so it tracks the
     /// menu bar's light/dark appearance the same way native icons do; only
     /// the value text carries the severity color, keeping the glyph itself
@@ -158,6 +158,11 @@ final class StatusBarController: NSObject {
 
         result.append(NSAttributedString(string: entry.valueText, attributes: [.font: font, .foregroundColor: color]))
         return result
+    }
+
+    private var entrySeparator: NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
+        return NSAttributedString(string: " · ", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])
     }
 
     private func removeCombinedItem() {

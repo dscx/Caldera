@@ -15,7 +15,7 @@ overhead.
   sensor keys discovered dynamically at launch (not hardcoded), since Apple
   Silicon's SMC key meanings shift across chip generations
 - Pin any sensor to the menu bar as `icon value`; pin several and they join
-  with `::`, or show one combined item instead of separate ones
+  with a middle dot, or show one combined item instead of separate ones
 - Popover lists every sensor grouped by hardware area, with collapsible
   sections, per-sensor alert thresholds, history sparklines, and °C/°F
 - Optional per-group averaging — collapse all pinned CPU sensors (etc.) into

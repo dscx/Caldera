@@ -9,7 +9,7 @@ struct SensorReading: Identifiable, Equatable {
     /// Canonical unit for `kind`: Celsius for temperature, RPM for fan, watts for power.
     var rawValue: Double
 
-    /// The "icon" half of the menu bar's "icon::value" display. Temperature
+    /// The "icon" half of the menu bar's "icon value" display. Temperature
     /// readings use their hardware-area icon (CPU/GPU/battery/etc.); fan and
     /// power readings use a fixed icon since they aren't broken down by area.
     var icon: String {
