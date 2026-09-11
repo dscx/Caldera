@@ -10,10 +10,14 @@ final class PreferencesStore: ObservableObject {
     private static let defaultAlertThresholdDefaultsKey = "TempBar.defaultAlertThresholdCelsius"
     private static let customAlertThresholdsDefaultsKey = "TempBar.customAlertThresholdsCelsius"
     private static let expandedSectionsDefaultsKey = "TempBar.expandedSections"
+    private static let hiddenSectionLabelsDefaultsKey = "TempBar.hiddenSectionLabels"
+    private static let hiddenKeysDefaultsKey = "TempBar.hiddenSensorKeys"
+    private static let sectionOrderDefaultsKey = "TempBar.sectionOrder"
 
     static let pollIntervalRange: ClosedRange<Double> = 1...30
     static let defaultAlertThresholdCelsius: Double = 85
     static let alertThresholdRange: ClosedRange<Double> = 40...110
+    static let defaultSectionOrder: [String] = MetricKind.allCases.map { $0.sectionTitle.uppercased() }
 
     @Published var visibleKeys: Set<String> {
         didSet {
@@ -64,6 +68,30 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// Section/subgroup labels excluded entirely from the main list (not
+    /// just collapsed) — set from Settings.
+    @Published var hiddenSectionLabels: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(hiddenSectionLabels), forKey: Self.hiddenSectionLabelsDefaultsKey)
+        }
+    }
+
+    /// Individual sensor keys excluded entirely from the main list, even if
+    /// their section is visible — set via a row's context menu.
+    @Published var hiddenKeys: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(hiddenKeys), forKey: Self.hiddenKeysDefaultsKey)
+        }
+    }
+
+    /// Display order for the top-level sections ("TEMPERATURES", "FANS",
+    /// "POWER"), user-reorderable from Settings.
+    @Published var sectionOrder: [String] {
+        didSet {
+            UserDefaults.standard.set(sectionOrder, forKey: Self.sectionOrderDefaultsKey)
+        }
+    }
+
     init() {
         let saved = UserDefaults.standard.array(forKey: Self.visibleKeysDefaultsKey) as? [String]
         visibleKeys = Set(saved ?? [])
@@ -86,6 +114,20 @@ final class PreferencesStore: ObservableObject {
 
         let savedExpanded = UserDefaults.standard.array(forKey: Self.expandedSectionsDefaultsKey) as? [String]
         expandedSections = Set(savedExpanded ?? [])
+
+        let savedHiddenSections = UserDefaults.standard.array(forKey: Self.hiddenSectionLabelsDefaultsKey) as? [String]
+        hiddenSectionLabels = Set(savedHiddenSections ?? [])
+
+        let savedHiddenKeys = UserDefaults.standard.array(forKey: Self.hiddenKeysDefaultsKey) as? [String]
+        hiddenKeys = Set(savedHiddenKeys ?? [])
+
+        let savedOrder = UserDefaults.standard.array(forKey: Self.sectionOrderDefaultsKey) as? [String]
+        // Reconcile against the current known sections rather than trusting
+        // a saved order blindly, so a future new MetricKind still shows up
+        // (appended) instead of silently vanishing from the list.
+        let resolvedOrder = savedOrder ?? Self.defaultSectionOrder
+        let knownRemaining = Self.defaultSectionOrder.filter { !resolvedOrder.contains($0) }
+        sectionOrder = resolvedOrder.filter { Self.defaultSectionOrder.contains($0) } + knownRemaining
     }
 
     func toggle(_ key: String) {
@@ -151,5 +193,29 @@ final class PreferencesStore: ObservableObject {
         } else {
             visibleKeys.subtract(keys)
         }
+    }
+
+    func isSectionHidden(_ label: String) -> Bool {
+        hiddenSectionLabels.contains(label)
+    }
+
+    func toggleHiddenSection(_ label: String) {
+        if hiddenSectionLabels.contains(label) {
+            hiddenSectionLabels.remove(label)
+        } else {
+            hiddenSectionLabels.insert(label)
+        }
+    }
+
+    func hideKey(_ key: String) {
+        hiddenKeys.insert(key)
+    }
+
+    func unhideKey(_ key: String) {
+        hiddenKeys.remove(key)
+    }
+
+    func moveSections(fromOffsets source: IndexSet, toOffset destination: Int) {
+        sectionOrder.move(fromOffsets: source, toOffset: destination)
     }
 }

@@ -14,12 +14,14 @@ final class StatusBarController: NSObject {
     private var statusItems: [String: NSStatusItem] = [:]
     private var combinedStatusItem: NSStatusItem?
     private let popover = NSPopover()
+    private let settingsWindowController: SettingsWindowController
     private var cancellables = Set<AnyCancellable>()
     private var didSelectDefault = false
 
     init(sensorStore: SensorStore, preferences: PreferencesStore) {
         self.sensorStore = sensorStore
         self.preferences = preferences
+        self.settingsWindowController = SettingsWindowController(sensorStore: sensorStore, preferences: preferences)
         super.init()
 
         popover.behavior = .transient
@@ -30,7 +32,14 @@ final class StatusBarController: NSObject {
         // content size sidesteps that stale-size bug entirely.
         popover.contentSize = NSSize(width: 340, height: 480)
         popover.contentViewController = NSHostingController(
-            rootView: DetailView(sensorStore: sensorStore, preferences: preferences)
+            rootView: DetailView(
+                sensorStore: sensorStore,
+                preferences: preferences,
+                onOpenSettings: { [weak self] in
+                    self?.popover.performClose(nil)
+                    self?.settingsWindowController.show()
+                }
+            )
         )
 
         let prefsStream = preferences.$visibleKeys

@@ -1,17 +1,20 @@
 import SwiftUI
 
-/// The popover content: every discovered sensor, grouped by category, with
-/// a checkbox to pin each one to the menu bar. This doubles as the detail
-/// view and the visibility/settings picker — there's nothing a separate
-/// settings screen would add here.
+/// The popover content: every discovered (and not hidden) sensor, grouped
+/// by category, with a checkbox to pin each one to the menu bar. Section
+/// visibility/order, hidden sensors, and general preferences live in the
+/// separate Settings window instead — this stays focused on the live list.
 struct DetailView: View {
     @ObservedObject var sensorStore: SensorStore
     @ObservedObject var preferences: PreferencesStore
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            settingsRow
+            if !sensorStore.topProcesses.isEmpty {
+                hotProcessesBanner
+            }
             Divider()
             content
             Divider()
@@ -28,57 +31,40 @@ struct DetailView: View {
             Text("\(preferences.visibleKeys.count) in menu bar")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            unitPicker
+            Button(action: onOpenSettings) {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.plain)
+            .help("Settings")
         }
         .padding(.horizontal, 12)
         .padding(.top, 12)
-        .padding(.bottom, 6)
+        .padding(.bottom, 10)
     }
 
-    private var unitPicker: some View {
-        Picker("", selection: $preferences.temperatureUnit) {
-            Text("°C").tag(TemperatureUnit.celsius)
-            Text("°F").tag(TemperatureUnit.fahrenheit)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 84)
-    }
-
-    private var settingsRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text("Menu bar:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("", selection: $preferences.displayMode) {
-                    Text("Separate").tag(DisplayMode.separate)
-                    Text("Combined").tag(DisplayMode.combined)
+    /// There's no API mapping a specific sensor to the process heating it,
+    /// so this shows a system-wide "what's busy right now" hint — not a
+    /// precise cause — and only while something pinned is actually hot.
+    private var hotProcessesBanner: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Running hot — top CPU processes")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.orange)
+            ForEach(sensorStore.topProcesses) { proc in
+                HStack {
+                    Text(proc.name)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(String(format: "%.0f%%", proc.cpuPercent))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 160)
-            }
-            HStack(spacing: 10) {
-                Stepper(
-                    "Refresh: \(Int(preferences.pollIntervalSeconds))s",
-                    value: $preferences.pollIntervalSeconds,
-                    in: PreferencesStore.pollIntervalRange,
-                    step: 1
-                )
-                .font(.caption)
-                Spacer()
-                Stepper(
-                    "Default alert ≥ \(Int(preferences.defaultAlertThreshold))°C",
-                    value: $preferences.defaultAlertThreshold,
-                    in: PreferencesStore.alertThresholdRange,
-                    step: 5
-                )
-                .font(.caption)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.12))
     }
 
     @ViewBuilder
@@ -102,31 +88,37 @@ struct DetailView: View {
     private var sensorList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(MetricKind.allCases, id: \.self) { kind in
-                    let items = sensorStore.readings.filter { $0.kind == kind }
-                    if !items.isEmpty {
-                        let sectionKey = kind.sectionTitle.uppercased()
-                        sectionHeader(sectionKey, items: items)
-                        if !preferences.isCollapsed(sectionKey) {
-                            if kind == .temperature {
-                                // The temperature list can run into the hundreds
-                                // of sensors, so it gets a second grouping level:
-                                // known hardware areas first, then any sensors
-                                // without a curated name clustered by their
-                                // shared SMC key prefix (e.g. TD00, TD01, TD02…
-                                // together) rather than dumped into one flat list.
-                                ForEach(orderedSubgroups(of: items), id: \.self) { label in
-                                    let subItems = items.filter { $0.temperatureGroupLabel == label }
-                                    subgroupHeader(label, items: subItems)
-                                    if !preferences.isCollapsed(label) {
-                                        ForEach(subItems) { reading in
-                                            sensorRow(reading)
+                ForEach(preferences.sectionOrder, id: \.self) { sectionKey in
+                    if let kind = MetricKind.allCases.first(where: { $0.sectionTitle.uppercased() == sectionKey }),
+                       !preferences.isSectionHidden(sectionKey) {
+                        let items = sensorStore.readings.filter {
+                            $0.kind == kind && !preferences.hiddenKeys.contains($0.key)
+                        }
+                        if !items.isEmpty {
+                            sectionHeader(sectionKey, items: items)
+                            if !preferences.isCollapsed(sectionKey) {
+                                if kind == .temperature {
+                                    // The temperature list can run into the hundreds
+                                    // of sensors, so it gets a second grouping level:
+                                    // known hardware areas first, then any sensors
+                                    // without a curated name clustered by their
+                                    // shared SMC key prefix (e.g. TD00, TD01, TD02…
+                                    // together) rather than dumped into one flat list.
+                                    ForEach(orderedSubgroups(of: items), id: \.self) { label in
+                                        if !preferences.isSectionHidden(label) {
+                                            let subItems = items.filter { $0.temperatureGroupLabel == label }
+                                            subgroupHeader(label, items: subItems)
+                                            if !preferences.isCollapsed(label) {
+                                                ForEach(subItems) { reading in
+                                                    sensorRow(reading)
+                                                }
+                                            }
                                         }
                                     }
-                                }
-                            } else {
-                                ForEach(items) { reading in
-                                    sensorRow(reading)
+                                } else {
+                                    ForEach(items) { reading in
+                                        sensorRow(reading)
+                                    }
                                 }
                             }
                         }
@@ -153,7 +145,8 @@ struct DetailView: View {
     /// section) can be tucked away instead of always eating scroll space.
     /// The leading checkbox is a separate control: it pins/unpins every
     /// sensor in the group to the menu bar at once, showing a dash when the
-    /// group is partially pinned.
+    /// group is partially pinned. To hide a section entirely (not just
+    /// collapse it), or reorder sections, see Settings.
     private func sectionHeader(_ title: String, items: [SensorReading]) -> some View {
         headerRow(title: title, items: items, indent: 12, titleSize: 10, chevronSize: 8, style: .secondary)
     }
@@ -228,27 +221,24 @@ struct DetailView: View {
             },
             onThresholdReset: { preferences.resetAlertThreshold(for: reading.key) }
         )
+        .contextMenu {
+            Button("Hide This Sensor") {
+                preferences.hideKey(reading.key)
+            }
+        }
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Check a sensor to pin it to the menu bar")
+        HStack {
+            Text("Check a sensor to pin it, right-click to hide it")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            HStack {
-                Toggle("Launch at login", isOn: Binding(
-                    get: { LaunchAtLogin.isEnabled },
-                    set: { LaunchAtLogin.setEnabled($0) }
-                ))
-                .toggleStyle(.checkbox)
-                .font(.caption)
-                Spacer()
-                Button("Quit") {
-                    NSApplication.shared.terminate(nil)
-                }
-                .buttonStyle(.plain)
-                .font(.caption)
+            Spacer()
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
             }
+            .buttonStyle(.plain)
+            .font(.caption)
         }
         .padding(10)
     }

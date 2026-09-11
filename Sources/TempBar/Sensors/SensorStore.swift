@@ -12,6 +12,9 @@ final class SensorStore: ObservableObject {
     @Published private(set) var history: [String: [Double]] = [:]
     @Published private(set) var isScanning = true
     @Published private(set) var errorMessage: String?
+    /// System-wide top CPU consumers, populated only while at least one
+    /// pinned temperature sensor is hot — see `checkAlerts`.
+    @Published private(set) var topProcesses: [ProcessCPUUsage] = []
 
     private let smc = SMC()
     private let queue = DispatchQueue(label: "com.dscx.tempbar.smc")
@@ -133,6 +136,7 @@ final class SensorStore: ObservableObject {
         guard let preferences else { return }
         let pinned = preferences.visibleKeys
         let unit = preferences.temperatureUnit
+        var anyHot = false
 
         for reading in readings where reading.kind == .temperature && pinned.contains(reading.key) {
             let threshold = preferences.alertThreshold(for: reading.key)
@@ -141,7 +145,28 @@ final class SensorStore: ObservableObject {
             if newSeverity == .hot, oldSeverity != .hot {
                 AlertNotifier.fireHotAlert(sensorName: reading.name, valueText: reading.formattedPrecise(unit: unit))
             }
+            if newSeverity == .hot { anyHot = true }
             previousSeverities[reading.key] = newSeverity
+        }
+
+        updateTopProcesses(anyHot: anyHot)
+    }
+
+    /// There's no API mapping a specific SMC key to the process heating it,
+    /// so this is a system-wide "what's busy right now" hint that only
+    /// appears while something pinned is actually hot — not shown, and not
+    /// spawning `ps`, the rest of the time. The subprocess call itself runs
+    /// off the main thread; only the stateless result crosses back to it.
+    private func updateTopProcesses(anyHot: Bool) {
+        guard anyHot else {
+            if !topProcesses.isEmpty { topProcesses = [] }
+            return
+        }
+        queue.async { [weak self] in
+            let processes = ProcessMonitor.topProcesses(limit: 5)
+            DispatchQueue.main.async {
+                self?.topProcesses = processes
+            }
         }
     }
 
