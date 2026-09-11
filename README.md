@@ -1,4 +1,7 @@
-<h1><img src="docs/icon.png" width="96" style="vertical-align: middle" alt=""> Caldera</h1>
+<table><tr>
+<td><img src="docs/icon.png" width="96" alt=""></td>
+<td valign="middle"><h1>Caldera</h1></td>
+</tr></table>
 
 A native macOS menu bar app that reads temperature, fan, and power sensors
 directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
