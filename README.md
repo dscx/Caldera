@@ -4,6 +4,11 @@ A native macOS menu bar app that reads temperature, fan, and power sensors
 directly via IOKit/SMC — no third-party libraries, no Activity-Monitor-style
 overhead.
 
+<p align="center">
+  <img src="docs/main.png" width="360" alt="Caldera's sensor popover, showing pinned CPU and fan sensors with sparklines and top CPU processes"><br>
+  <img src="docs/settings.png" width="360" alt="Caldera's Settings window, showing general preferences and section management">
+</p>
+
 ## Features
 
 - Reads real hardware sensors via the System Management Controller, with

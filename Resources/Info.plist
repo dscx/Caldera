@@ -10,6 +10,8 @@
     <string>Caldera</string>
     <key>CFBundleDisplayName</key>
     <string>Caldera</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
