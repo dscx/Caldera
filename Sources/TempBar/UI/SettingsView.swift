@@ -9,14 +9,14 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section("Sections (drag to reorder)") {
-                ForEach(preferences.sectionOrder, id: \.self) { label in
+            Section("Sections") {
+                ForEach(preferences.sectionOrder.indices, id: \.self) { index in
+                    let label = preferences.sectionOrder[index]
                     // These are always the all-caps section titles
                     // ("TEMPERATURES"), so .capitalized reliably gives
                     // "Temperatures" — safe here specifically.
-                    sectionRow(label, displayText: label.capitalized)
+                    sectionRow(label, displayText: label.capitalized, index: index)
                 }
-                .onMove { preferences.moveSections(fromOffsets: $0, toOffset: $1) }
             }
 
             if !temperatureSubgroups.isEmpty {
@@ -70,13 +70,16 @@ struct SettingsView: View {
                     get: { LaunchAtLogin.isEnabled },
                     set: { LaunchAtLogin.setEnabled($0) }
                 ))
+                Toggle("Alert on any sensor, not just pinned", isOn: $preferences.alertForAllSensors)
             }
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .frame(minWidth: 340, minHeight: 420)
     }
 
-    private func sectionRow(_ label: String, displayText: String) -> some View {
+    /// `index` is only passed for the top-level, reorderable Sections list;
+    /// the Temperature Groups list omits it and gets no move buttons.
+    private func sectionRow(_ label: String, displayText: String, index: Int? = nil) -> some View {
         HStack {
             Toggle("", isOn: Binding(
                 get: { !preferences.isSectionHidden(label) },
@@ -86,6 +89,18 @@ struct SettingsView: View {
             .toggleStyle(.checkbox)
             Text(displayText)
             Spacer()
+            if let index {
+                Button(action: { preferences.swapSections(index, index - 1) }) {
+                    Image(systemName: "chevron.up")
+                }
+                .buttonStyle(.plain)
+                .disabled(index == 0)
+                Button(action: { preferences.swapSections(index, index + 1) }) {
+                    Image(systemName: "chevron.down")
+                }
+                .buttonStyle(.plain)
+                .disabled(index == preferences.sectionOrder.count - 1)
+            }
         }
     }
 

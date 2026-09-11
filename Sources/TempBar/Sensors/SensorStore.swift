@@ -128,17 +128,19 @@ final class SensorStore: ObservableObject {
         }
     }
 
-    /// Fires a best-effort notification the moment a *pinned* temperature
-    /// sensor first crosses into "hot" — not on every poll while it stays
-    /// hot. The menu bar's coloring (always up to date) is the reliable
-    /// signal; this is a bonus nudge on top of it.
+    /// Fires a best-effort notification the moment a temperature sensor
+    /// first crosses into "hot" — not on every poll while it stays hot. The
+    /// menu bar's coloring (always up to date) is the reliable signal; this
+    /// is a bonus nudge on top of it. Scoped to pinned sensors only, unless
+    /// `alertForAllSensors` widens it to everything discovered.
     private func checkAlerts(readings: [SensorReading]) {
         guard let preferences else { return }
         let pinned = preferences.visibleKeys
+        let alertAll = preferences.alertForAllSensors
         let unit = preferences.temperatureUnit
         var anyHot = false
 
-        for reading in readings where reading.kind == .temperature && pinned.contains(reading.key) {
+        for reading in readings where reading.kind == .temperature && (alertAll || pinned.contains(reading.key)) {
             let threshold = preferences.alertThreshold(for: reading.key)
             let newSeverity = severity(for: reading, hotThresholdCelsius: threshold)
             let oldSeverity = previousSeverities[reading.key] ?? .normal

@@ -13,6 +13,7 @@ final class PreferencesStore: ObservableObject {
     private static let hiddenSectionLabelsDefaultsKey = "TempBar.hiddenSectionLabels"
     private static let hiddenKeysDefaultsKey = "TempBar.hiddenSensorKeys"
     private static let sectionOrderDefaultsKey = "TempBar.sectionOrder"
+    private static let alertForAllSensorsDefaultsKey = "TempBar.alertForAllSensors"
 
     static let pollIntervalRange: ClosedRange<Double> = 1...30
     static let defaultAlertThresholdCelsius: Double = 85
@@ -92,6 +93,16 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// Off by default: hot-threshold alerts (the system notification and the
+    /// "Running hot" banner) only fire for sensors pinned to the menu bar.
+    /// Turning this on widens alerting to every discovered temperature
+    /// sensor, not just checked ones.
+    @Published var alertForAllSensors: Bool {
+        didSet {
+            UserDefaults.standard.set(alertForAllSensors, forKey: Self.alertForAllSensorsDefaultsKey)
+        }
+    }
+
     init() {
         let saved = UserDefaults.standard.array(forKey: Self.visibleKeysDefaultsKey) as? [String]
         visibleKeys = Set(saved ?? [])
@@ -128,6 +139,8 @@ final class PreferencesStore: ObservableObject {
         let resolvedOrder = savedOrder ?? Self.defaultSectionOrder
         let knownRemaining = Self.defaultSectionOrder.filter { !resolvedOrder.contains($0) }
         sectionOrder = resolvedOrder.filter { Self.defaultSectionOrder.contains($0) } + knownRemaining
+
+        alertForAllSensors = UserDefaults.standard.bool(forKey: Self.alertForAllSensorsDefaultsKey)
     }
 
     func toggle(_ key: String) {
@@ -215,7 +228,11 @@ final class PreferencesStore: ObservableObject {
         hiddenKeys.remove(key)
     }
 
-    func moveSections(fromOffsets source: IndexSet, toOffset destination: Int) {
-        sectionOrder.move(fromOffsets: source, toOffset: destination)
+    /// Swaps two sections' positions — used by Settings' up/down reorder
+    /// buttons. (SwiftUI List drag-to-reorder via onMove proved unreliable
+    /// in this window, so reordering is button-driven instead of gesture-driven.)
+    func swapSections(_ i: Int, _ j: Int) {
+        guard sectionOrder.indices.contains(i), sectionOrder.indices.contains(j) else { return }
+        sectionOrder.swapAt(i, j)
     }
 }
