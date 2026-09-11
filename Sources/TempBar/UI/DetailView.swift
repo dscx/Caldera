@@ -14,13 +14,11 @@ struct DetailView: View {
             header
             Divider()
             content
-            // Anchored above the footer, not the header, so it doesn't push
-            // the sensor list around every time it appears/disappears — only
-            // this bottom strip changes size.
-            if !sensorStore.topProcesses.isEmpty {
-                Divider()
-                hotProcessesBanner
-            }
+            // Anchored above the footer, not the header, so it doesn't
+            // change the sensor list's position — only this bottom strip's
+            // row count varies as the process list refreshes.
+            Divider()
+            topProcessesPanel
             Divider()
             footer
         }
@@ -46,29 +44,36 @@ struct DetailView: View {
         .padding(.bottom, 10)
     }
 
-    /// There's no API mapping a specific sensor to the process heating it,
-    /// so this shows a system-wide "what's busy right now" hint — not a
-    /// precise cause — and only while something pinned is actually hot.
-    private var hotProcessesBanner: some View {
+    /// Always visible, refreshed continuously on its own timer — an
+    /// Activity-Monitor-style "what's using CPU right now" panel, not an
+    /// alert tied to any sensor being hot. (There's also no API mapping a
+    /// specific sensor to a specific process, so it's system-wide context
+    /// rather than a claimed cause even when something is hot.)
+    private var topProcessesPanel: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("Running hot — top CPU processes")
+            Text("TOP CPU PROCESSES")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.orange)
-            ForEach(sensorStore.topProcesses) { proc in
-                HStack {
-                    Text(proc.name)
-                        .font(.system(size: 11))
-                        .lineLimit(1)
-                    Spacer()
-                    Text(String(format: "%.0f%%", proc.cpuPercent))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                .foregroundStyle(.secondary)
+            if sensorStore.topProcesses.isEmpty {
+                Text("Loading…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(sensorStore.topProcesses) { proc in
+                    HStack {
+                        Text(proc.name)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                        Spacer()
+                        Text(String(format: "%.0f%%", proc.cpuPercent))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.orange.opacity(0.12))
     }
 
     @ViewBuilder
@@ -234,9 +239,6 @@ struct DetailView: View {
 
     private var footer: some View {
         HStack {
-            Text("Check a sensor to pin it, right-click to hide it")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
             Spacer()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)

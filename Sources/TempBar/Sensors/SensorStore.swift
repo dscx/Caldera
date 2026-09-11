@@ -12,8 +12,8 @@ final class SensorStore: ObservableObject {
     @Published private(set) var history: [String: [Double]] = [:]
     @Published private(set) var isScanning = true
     @Published private(set) var errorMessage: String?
-    /// System-wide top CPU consumers, populated only while at least one
-    /// pinned temperature sensor is hot — see `checkAlerts`.
+    /// System-wide top CPU consumers, refreshed continuously on its own
+    /// timer — see `refreshTopProcesses`.
     @Published private(set) var topProcesses: [ProcessCPUUsage] = []
 
     private let smc = SMC()
@@ -24,10 +24,15 @@ final class SensorStore: ObservableObject {
     /// doesn't shift if one sensor briefly fails to decode on a given poll.
     private var assignedNames: [String: String] = [:]
     private var timer: Timer?
+    private var processTimer: Timer?
     private var intervalCancellable: AnyCancellable?
     private var preferences: PreferencesStore?
     private var previousSeverities: [String: Severity] = [:]
     private let historyLimit = 40
+    /// Fixed, not tied to the user's (possibly very fast, down to 1s) sensor
+    /// poll interval — there's no need to spawn `ps` that often for a list
+    /// that's just informational context, not a live alert signal.
+    private let processFetchInterval: TimeInterval = 3.0
 
     func start(preferences: PreferencesStore) {
         self.preferences = preferences
@@ -40,12 +45,21 @@ final class SensorStore: ObservableObject {
 
         queue.async { [weak self] in
             self?.openAndDiscover()
+            self?.refreshTopProcesses()
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.processTimer = Timer.scheduledTimer(withTimeInterval: self.processFetchInterval, repeats: true) { [weak self] _ in
+                self?.queue.async { self?.refreshTopProcesses() }
+            }
         }
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
+        processTimer?.invalidate()
+        processTimer = nil
         intervalCancellable = nil
         queue.async { [weak self] in
             self?.smc.close()
@@ -143,7 +157,6 @@ final class SensorStore: ObservableObject {
         let pinned = preferences.visibleKeys
         let alertAll = preferences.alertForAllSensors
         let unit = preferences.temperatureUnit
-        var anyHot = false
 
         for reading in readings where reading.kind == .temperature && (alertAll || pinned.contains(reading.key)) {
             let threshold = preferences.alertThreshold(for: reading.key)
@@ -152,28 +165,19 @@ final class SensorStore: ObservableObject {
             if newSeverity == .hot, oldSeverity != .hot {
                 AlertNotifier.fireHotAlert(sensorName: reading.name, valueText: reading.formattedPrecise(unit: unit))
             }
-            if newSeverity == .hot { anyHot = true }
             previousSeverities[reading.key] = newSeverity
         }
-
-        updateTopProcesses(anyHot: anyHot)
     }
 
-    /// There's no API mapping a specific SMC key to the process heating it,
-    /// so this is a system-wide "what's busy right now" hint that only
-    /// appears while something pinned is actually hot — not shown, and not
-    /// spawning `ps`, the rest of the time. The subprocess call itself runs
-    /// off the main thread; only the stateless result crosses back to it.
-    private func updateTopProcesses(anyHot: Bool) {
-        guard anyHot else {
-            if !topProcesses.isEmpty { topProcesses = [] }
-            return
-        }
-        queue.async { [weak self] in
-            let processes = ProcessMonitor.topProcesses(limit: 5)
-            DispatchQueue.main.async {
-                self?.topProcesses = processes
-            }
+    /// Runs on its own timer (`processFetchInterval`), independent of hot/
+    /// cold state — an always-current "what's using CPU right now" panel,
+    /// same idea as Activity Monitor's process list, not an alert-only hint.
+    /// Called on `queue` (background); only the stateless result crosses
+    /// back to the main queue.
+    private func refreshTopProcesses() {
+        let processes = ProcessMonitor.topProcesses(limit: 5)
+        DispatchQueue.main.async { [weak self] in
+            self?.topProcesses = processes
         }
     }
 
