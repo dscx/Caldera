@@ -29,6 +29,26 @@ overhead.
 - Best-effort system notification + a "Running hot" banner listing the
   system's top CPU-consuming processes when a pinned sensor crosses its
   threshold
+- Manual fan override, per fan, clamped to its own hardware min/max —
+  reverts to automatic control the moment Caldera quits (see
+  [Fan control](#fan-control))
+
+## Fan control
+
+Each fan in the popover has a "Manual Control…" link. Clicking it seeds a
+slider at the fan's current speed; dragging it writes a new target RPM,
+clamped to that fan's own hardware min/max so it can never be pushed outside
+what Apple's firmware already considers a safe range. "Auto" hands control
+back at any time, and quitting Caldera (or it crashing) does the same
+automatically — manual targets are never saved to disk, so every launch
+starts in automatic.
+
+Under the hood this writes directly to the SMC's fan target key. Some Macs
+expose a separate "force manual" key that most fan-control tools use to
+lock in an override; this one doesn't, so Caldera instead keeps rewriting
+the target on every poll tick and simply stops the instant it's not
+supposed to be in control anymore, letting the firmware's own thermal loop
+reclaim the key.
 
 ## Requirements
 

@@ -63,6 +63,32 @@ func decodeSMCValue(dataType: UInt32, dataSize: UInt32, bytes: SMCBytes) -> Doub
     }
 }
 
+/// Encodes a Double into SMC wire bytes for a writable key, given the data
+/// type its own getKeyInfo reported — the inverse of `decodeSMCValue`'s
+/// "flt " and "fpe2" cases, the only two wire types Caldera ever writes
+/// (both are fan-speed formats; see FanControlState). Any other type returns
+/// nil rather than guessing at an encoding.
+func encodeSMCValue(_ value: Double, dataType: UInt32) -> SMCBytes? {
+    let type = fourCharString(from: dataType)
+    var bytes = smcZeroBytes
+    switch type {
+    case "flt ":
+        let bits = Float(value).bitPattern
+        bytes.0 = UInt8(bits & 0xFF)
+        bytes.1 = UInt8((bits >> 8) & 0xFF)
+        bytes.2 = UInt8((bits >> 16) & 0xFF)
+        bytes.3 = UInt8((bits >> 24) & 0xFF)
+        return bytes
+    case "fpe2":
+        let raw = UInt16(clamping: Int((value * 4).rounded()))
+        bytes.0 = UInt8((raw >> 8) & 0xFF)
+        bytes.1 = UInt8(raw & 0xFF)
+        return bytes
+    default:
+        return nil
+    }
+}
+
 struct DiscoveredSensor {
     let key: String
     let code: UInt32

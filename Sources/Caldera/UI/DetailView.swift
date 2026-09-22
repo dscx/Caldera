@@ -223,12 +223,16 @@ struct DetailView: View {
             hasCustomThreshold: preferences.hasCustomAlertThreshold(for: reading.key),
             history: sensorStore.history[reading.key] ?? [],
             isVisible: preferences.visibleKeys.contains(reading.key),
+            fanControl: sensorStore.fanControls.first(where: { $0.acKey == reading.key }),
+            manualFanTarget: sensorStore.fanManualTargets[reading.key],
             onToggle: { preferences.toggle(reading.key) },
             onThresholdChange: { newValue in
                 let clamped = min(max(newValue, PreferencesStore.alertThresholdRange.lowerBound), PreferencesStore.alertThresholdRange.upperBound)
                 preferences.setCustomAlertThreshold(clamped, for: reading.key)
             },
-            onThresholdReset: { preferences.resetAlertThreshold(for: reading.key) }
+            onThresholdReset: { preferences.resetAlertThreshold(for: reading.key) },
+            onFanTargetChange: { rpm in sensorStore.setFanManualTarget(acKey: reading.key, rpm: rpm) },
+            onFanAutomatic: { sensorStore.setFanAutomatic(acKey: reading.key) }
         )
         .contextMenu {
             Button("Hide This Sensor") {
@@ -257,9 +261,13 @@ private struct SensorRow: View {
     let hasCustomThreshold: Bool
     let history: [Double]
     let isVisible: Bool
+    let fanControl: FanControlState?
+    let manualFanTarget: Double?
     let onToggle: () -> Void
     let onThresholdChange: (Double) -> Void
     let onThresholdReset: () -> Void
+    let onFanTargetChange: (Double) -> Void
+    let onFanAutomatic: () -> Void
 
     private var currentSeverity: Severity {
         severity(for: reading, hotThresholdCelsius: threshold)
@@ -304,9 +312,50 @@ private struct SensorRow: View {
                 thresholdControl
                     .padding(.leading, 40)
             }
+
+            if reading.kind == .fan, let fanControl {
+                fanControlRow(fanControl)
+                    .padding(.leading, 40)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
+    }
+
+    /// "Manual Control…" seeds the target at the fan's current live speed —
+    /// no jump when engaging override — then a slider (clamped to the fan's
+    /// own SMC-reported min/max) adjusts it. "Auto" hands control back;
+    /// quitting Caldera does the same automatically.
+    private func fanControlRow(_ control: FanControlState) -> some View {
+        Group {
+            if let manualFanTarget {
+                HStack(spacing: 6) {
+                    Slider(
+                        value: Binding(
+                            get: { manualFanTarget },
+                            set: { onFanTargetChange($0) }
+                        ),
+                        in: control.minRPM...control.maxRPM
+                    )
+                    .frame(width: 110)
+                    Text("\(Int(manualFanTarget)) RPM")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Button("Auto", action: onFanAutomatic)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            } else {
+                Button("Manual Control…") {
+                    onFanTargetChange(reading.rawValue)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+                .help("Override this fan's speed. Reverts to automatic when Caldera quits.")
+            }
+        }
     }
 
     private var thresholdControl: some View {

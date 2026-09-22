@@ -12,6 +12,12 @@ final class SensorStore: ObservableObject {
     @Published private(set) var history: [String: [Double]] = [:]
     @Published private(set) var isScanning = true
     @Published private(set) var errorMessage: String?
+    /// Fans Caldera can override on this Mac, discovered once at launch.
+    @Published private(set) var fanControls: [FanControlState] = []
+    /// Keyed by FanControlState.acKey. A fan present here is in manual mode
+    /// at this target RPM; absent means automatic. Never persisted — see
+    /// FanControlState's doc comment.
+    @Published private(set) var fanManualTargets: [String: Double] = [:]
     /// System-wide top CPU consumers, refreshed continuously on its own
     /// timer — see `refreshTopProcesses`.
     @Published private(set) var topProcesses: [ProcessCPUUsage] = []
@@ -19,6 +25,12 @@ final class SensorStore: ObservableObject {
     private let smc = SMC()
     private let queue = DispatchQueue(label: "com.dscx.caldera.smc")
     private var sensors: [DiscoveredSensor] = []
+    /// `queue`-confined mirror of `fanControls`, for pollOnce's re-assertion
+    /// loop — same read-only-after-launch/main-thread-copy split as `sensors`.
+    private var fanControlDescriptors: [FanControlState] = []
+    /// `queue`-confined source of truth for which fans are in manual mode
+    /// and at what target — `fanManualTargets` is the main-thread mirror.
+    private var activeManualFanTargets: [String: Double] = [:]
     /// CPU-category keys without a curated name get a stable "CPU Sensor N"
     /// label, computed once from the full discovered set so numbering
     /// doesn't shift if one sensor briefly fails to decode on a given poll.
@@ -62,6 +74,9 @@ final class SensorStore: ObservableObject {
         processTimer = nil
         intervalCancellable = nil
         queue.async { [weak self] in
+            // Dropping manual targets before close is the entire "restore
+            // automatic" step on this SMC generation — see FanControlState.
+            self?.activeManualFanTargets.removeAll()
             self?.smc.close()
         }
     }
@@ -77,6 +92,12 @@ final class SensorStore: ObservableObject {
         let discovered = discoverSensors(smc: smc)
         sensors = discovered
         assignedNames = SensorCatalog.assignDescriptiveNames(for: discovered.map(\.key))
+
+        let fans = discoverFanControls(smc: smc)
+        fanControlDescriptors = fans
+        DispatchQueue.main.async { [weak self] in
+            self?.fanControls = fans
+        }
 
         if discovered.isEmpty {
             publish(isScanning: false, errorMessage: "No sensors were found on this Mac.")
@@ -98,6 +119,15 @@ final class SensorStore: ObservableObject {
 
     private func pollOnce() {
         guard !sensors.isEmpty else { return }
+
+        // Re-assert every manual fan target on each poll tick rather than
+        // write-once: this SMC generation's own thermal loop keeps
+        // recalculating the target key on its own cadence, so a one-time
+        // write would just get quietly overwritten again shortly after.
+        for (acKey, target) in activeManualFanTargets {
+            guard let control = fanControlDescriptors.first(where: { $0.acKey == acKey }) else { continue }
+            writeFanTarget(control: control, rpm: target)
+        }
 
         var updated: [SensorReading] = []
         updated.reserveCapacity(sensors.count)
@@ -186,5 +216,72 @@ final class SensorStore: ObservableObject {
             self?.isScanning = isScanning
             self?.errorMessage = errorMessage
         }
+    }
+
+    /// Overrides a fan's target RPM, clamped to its own SMC-reported
+    /// min/max, and puts it in manual mode. Safe to call repeatedly (e.g.
+    /// while dragging a slider) — each call replaces the previous target.
+    func setFanManualTarget(acKey: String, rpm: Double) {
+        queue.async { [weak self] in
+            guard let self, let control = self.fanControlDescriptors.first(where: { $0.acKey == acKey }) else { return }
+            let clamped = min(max(rpm, control.minRPM), control.maxRPM)
+            self.activeManualFanTargets[acKey] = clamped
+            self.writeFanTarget(control: control, rpm: clamped)
+            DispatchQueue.main.async { [weak self] in
+                self?.fanManualTargets[acKey] = clamped
+            }
+        }
+    }
+
+    /// Returns a fan to automatic control by simply no longer rewriting its
+    /// target key — see FanControlState's doc comment for why that alone is
+    /// sufficient on this SMC generation.
+    func setFanAutomatic(acKey: String) {
+        queue.async { [weak self] in
+            self?.activeManualFanTargets.removeValue(forKey: acKey)
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.fanManualTargets.removeValue(forKey: acKey)
+        }
+    }
+
+    private func writeFanTarget(control: FanControlState, rpm: Double) {
+        guard let bytes = encodeSMCValue(rpm, dataType: control.dataType) else { return }
+        try? smc.writeRaw(forCode: fourCharCode(from: control.targetKey), bytes: bytes)
+    }
+
+    /// Enumerates this Mac's fans via "FNum", then keeps only the ones whose
+    /// min/max bounds and target key all read back cleanly — a fan Caldera
+    /// can't read bounds for is one it won't guess bounds for either.
+    private func discoverFanControls(smc: SMC) -> [FanControlState] {
+        guard
+            let countRaw = try? smc.readRaw(forCode: fourCharCode(from: "FNum")),
+            let countValue = decodeSMCValue(dataType: countRaw.dataType, dataSize: countRaw.dataSize, bytes: countRaw.bytes)
+        else { return [] }
+
+        var result: [FanControlState] = []
+        for index in 0..<Int(countValue) {
+            let acKey = "F\(index)Ac"
+            guard
+                let mnRaw = try? smc.readRaw(forCode: fourCharCode(from: "F\(index)Mn")),
+                let minRPM = decodeSMCValue(dataType: mnRaw.dataType, dataSize: mnRaw.dataSize, bytes: mnRaw.bytes),
+                let mxRaw = try? smc.readRaw(forCode: fourCharCode(from: "F\(index)Mx")),
+                let maxRPM = decodeSMCValue(dataType: mxRaw.dataType, dataSize: mxRaw.dataSize, bytes: mxRaw.bytes),
+                let tgRaw = try? smc.readRaw(forCode: fourCharCode(from: "F\(index)Tg")),
+                maxRPM > minRPM
+            else { continue }
+
+            let curatedName = SensorCatalog.name(for: acKey)
+            let name = curatedName != acKey ? curatedName : "Fan \(index + 1)"
+            result.append(FanControlState(
+                acKey: acKey,
+                targetKey: "F\(index)Tg",
+                name: name,
+                minRPM: minRPM,
+                maxRPM: maxRPM,
+                dataType: tgRaw.dataType
+            ))
+        }
+        return result
     }
 }

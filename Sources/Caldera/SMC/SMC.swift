@@ -88,6 +88,22 @@ final class SMC {
         let output = try call(&input)
         return SMCReading(dataType: info.dataType, dataSize: info.dataSize, bytes: output.bytes)
     }
+
+    /// Writes raw bytes to a key, given its 4-character code. `bytes` must
+    /// already be encoded for the key's own wire type (see
+    /// `encodeSMCValue`) — this layer only knows how to move bytes, not what
+    /// they mean. `keyInfo.dataSize` must match the key's declared size
+    /// exactly or the driver rejects the call, so it's re-fetched fresh here
+    /// rather than trusted from a caller-supplied value.
+    func writeRaw(forCode code: UInt32, bytes: SMCBytes) throws {
+        let info = try keyInfo(forCode: code)
+        var input = SMCParamStruct()
+        input.key = code
+        input.keyInfo.dataSize = info.dataSize
+        input.data8 = SMCSelector.writeKey.rawValue
+        input.bytes = bytes
+        try call(&input)
+    }
 }
 
 struct SMCReading {
