@@ -61,13 +61,23 @@ struct DetailView: View {
             } else {
                 ForEach(sensorStore.topProcesses) { proc in
                     HStack {
-                        Text(proc.name)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(proc.name)
+                                .font(.system(size: 11))
+                                .lineLimit(1)
+                            Text("PID \(proc.pid)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
-                        Text(String(format: "%.0f%%", proc.cpuPercent))
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text(String(format: "%.0f%% CPU", proc.cpuPercent))
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text(String(format: "%.1f%% MEM", proc.memPercent))
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

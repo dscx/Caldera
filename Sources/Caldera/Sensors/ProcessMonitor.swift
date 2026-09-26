@@ -5,6 +5,7 @@ struct ProcessCPUUsage: Identifiable, Equatable {
     let pid: Int32
     let name: String
     let cpuPercent: Double
+    let memPercent: Double
 }
 
 /// Shells out to `ps` for a CPU-sorted process snapshot, rather than
@@ -18,7 +19,7 @@ enum ProcessMonitor {
     static func topProcesses(limit: Int = 5) -> [ProcessCPUUsage] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-Ao", "pid=,pcpu=,comm=", "-r"]
+        process.arguments = ["-Ao", "pid=,pcpu=,pmem=,comm=", "-r"]
 
         let outPipe = Pipe()
         process.standardOutput = outPipe
@@ -37,10 +38,10 @@ enum ProcessMonitor {
         var results: [ProcessCPUUsage] = []
         for line in output.split(separator: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let parts = trimmed.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
-            guard parts.count >= 3, let pid = Int32(parts[0]), let cpu = Double(parts[1]) else { continue }
-            let name = (String(parts[2]) as NSString).lastPathComponent
-            results.append(ProcessCPUUsage(pid: pid, name: name, cpuPercent: cpu))
+            let parts = trimmed.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
+            guard parts.count >= 4, let pid = Int32(parts[0]), let cpu = Double(parts[1]), let mem = Double(parts[2]) else { continue }
+            let name = (String(parts[3]) as NSString).lastPathComponent
+            results.append(ProcessCPUUsage(pid: pid, name: name, cpuPercent: cpu, memPercent: mem))
             if results.count >= limit { break }
         }
         return results
