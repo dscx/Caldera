@@ -29,9 +29,9 @@ overhead.
 - Best-effort system notification + a "Running hot" banner listing the
   system's top CPU-consuming processes when a pinned sensor crosses its
   threshold
-- Manual fan override, per fan, clamped to its own hardware min/max —
-  reverts to automatic control the moment Caldera quits (see
-  [Fan control](#fan-control))
+- Manual fan override, per fan, clamped to its own hardware min/max and
+  reverting to automatic the moment Caldera quits — where the Mac's SMC
+  allows it; read-only elsewhere (see [Fan control](#fan-control))
 
 ## Fan control
 
@@ -53,12 +53,14 @@ reclaim the key.
 **Whether this actually does anything depends on the Mac.** SMC key *reads*
 are unrestricted for any process, but on some machines the driver rejects
 *writes* from an unprivileged, unentitled app with `kIOReturnNotPrivileged`
-— confirmed by testing this live against real hardware, not assumed.
-Caldera detects that on the first write attempt and turns the control off
-entirely (with an explanatory line in place of the slider) rather than
-showing you a control that silently does nothing. Making it work on those
-Macs would mean a signed, privileged helper process — a real project, not a
-quick fix — so it isn't done here.
+— confirmed by testing this live against real hardware, not assumed. Caldera
+checks this once at launch (a genuine no-op: writing a key's own current
+bytes straight back to it) and, if writes aren't allowed, presents fan
+control as read-only from the very first popover open — an explanatory line
+in place of the slider, never a control that looks live but silently does
+nothing. Making it actually work on those Macs would mean a signed,
+privileged helper process — a real project, not a quick fix — so fan
+control stays read-only there for now.
 
 ## Requirements
 

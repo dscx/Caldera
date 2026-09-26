@@ -103,8 +103,17 @@ final class SensorStore: ObservableObject {
 
         let fans = discoverFanControls(smc: smc)
         fanControlDescriptors = fans
+        // Probed once, at launch, rather than waiting for the user to click
+        // "Manual Control…" and hit the failure themselves: a write-back of
+        // the exact bytes just read is a true no-op (not even a round-trip
+        // through encodeSMCValue), so this can't itself change fan behavior
+        // — it only answers whether writes are permitted at all on this Mac.
+        let writable = probeFanWriteSupport(smc: smc, controls: fans)
         DispatchQueue.main.async { [weak self] in
             self?.fanControls = fans
+            if !writable {
+                self?.fanControlUnsupported = true
+            }
         }
 
         if discovered.isEmpty {
@@ -315,5 +324,16 @@ final class SensorStore: ObservableObject {
             ))
         }
         return result
+    }
+
+    /// Writes a fan's target key back to the exact bytes just read from it —
+    /// a true no-op, not a round-trip through encodeSMCValue — purely to
+    /// answer "does this Mac's SMC allow writes from this process at all."
+    /// Testing the first fan is enough: the rejection is a process-level
+    /// privilege check (kIOReturnNotPrivileged), not specific to one key.
+    private func probeFanWriteSupport(smc: SMC, controls: [FanControlState]) -> Bool {
+        guard let first = controls.first else { return true }
+        guard let current = try? smc.readRaw(forCode: fourCharCode(from: first.targetKey)) else { return true }
+        return (try? smc.writeRaw(forCode: fourCharCode(from: first.targetKey), bytes: current.bytes)) != nil
     }
 }
