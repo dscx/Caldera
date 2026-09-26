@@ -50,6 +50,16 @@ the target on every poll tick and simply stops the instant it's not
 supposed to be in control anymore, letting the firmware's own thermal loop
 reclaim the key.
 
+**Whether this actually does anything depends on the Mac.** SMC key *reads*
+are unrestricted for any process, but on some machines the driver rejects
+*writes* from an unprivileged, unentitled app with `kIOReturnNotPrivileged`
+— confirmed by testing this live against real hardware, not assumed.
+Caldera detects that on the first write attempt and turns the control off
+entirely (with an explanatory line in place of the slider) rather than
+showing you a control that silently does nothing. Making it work on those
+Macs would mean a signed, privileged helper process — a real project, not a
+quick fix — so it isn't done here.
+
 ## Requirements
 
 - Apple Silicon Mac, macOS 13+

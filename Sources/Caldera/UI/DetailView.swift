@@ -235,6 +235,7 @@ struct DetailView: View {
             isVisible: preferences.visibleKeys.contains(reading.key),
             fanControl: sensorStore.fanControls.first(where: { $0.acKey == reading.key }),
             manualFanTarget: sensorStore.fanManualTargets[reading.key],
+            fanControlUnsupported: sensorStore.fanControlUnsupported,
             onToggle: { preferences.toggle(reading.key) },
             onThresholdChange: { newValue in
                 let clamped = min(max(newValue, PreferencesStore.alertThresholdRange.lowerBound), PreferencesStore.alertThresholdRange.upperBound)
@@ -273,6 +274,7 @@ private struct SensorRow: View {
     let isVisible: Bool
     let fanControl: FanControlState?
     let manualFanTarget: Double?
+    let fanControlUnsupported: Bool
     let onToggle: () -> Void
     let onThresholdChange: (Double) -> Void
     let onThresholdReset: () -> Void
@@ -338,7 +340,11 @@ private struct SensorRow: View {
     /// quitting Caldera does the same automatically.
     private func fanControlRow(_ control: FanControlState) -> some View {
         Group {
-            if let manualFanTarget {
+            if fanControlUnsupported {
+                Text("Manual control isn't available on this Mac")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+            } else if let manualFanTarget {
                 HStack(spacing: 6) {
                     Slider(
                         value: Binding(

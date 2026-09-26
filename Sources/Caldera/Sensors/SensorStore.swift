@@ -18,6 +18,14 @@ final class SensorStore: ObservableObject {
     /// at this target RPM; absent means automatic. Never persisted — see
     /// FanControlState's doc comment.
     @Published private(set) var fanManualTargets: [String: Double] = [:]
+    /// Set the first time a fan-target write is rejected by the driver
+    /// (kIOReturnNotPrivileged, confirmed empirically: recent macOS refuses
+    /// SMC key *writes* from an unprivileged, unentitled process even though
+    /// reads are unrestricted — unlike the missing "FS! " key, this isn't
+    /// something Caldera can route around by rewriting more aggressively).
+    /// Once true, the UI stops offering manual control entirely rather than
+    /// showing a slider that silently does nothing.
+    @Published private(set) var fanControlUnsupported = false
     /// System-wide top CPU consumers, refreshed continuously on its own
     /// timer — see `refreshTopProcesses`.
     @Published private(set) var topProcesses: [ProcessCPUUsage] = []
@@ -126,7 +134,13 @@ final class SensorStore: ObservableObject {
         // write would just get quietly overwritten again shortly after.
         for (acKey, target) in activeManualFanTargets {
             guard let control = fanControlDescriptors.first(where: { $0.acKey == acKey }) else { continue }
-            writeFanTarget(control: control, rpm: target)
+            if !writeFanTarget(control: control, rpm: target) {
+                activeManualFanTargets.removeValue(forKey: acKey)
+                DispatchQueue.main.async { [weak self] in
+                    self?.fanControlUnsupported = true
+                    self?.fanManualTargets.removeValue(forKey: acKey)
+                }
+            }
         }
 
         var updated: [SensorReading] = []
@@ -221,12 +235,21 @@ final class SensorStore: ObservableObject {
     /// Overrides a fan's target RPM, clamped to its own SMC-reported
     /// min/max, and puts it in manual mode. Safe to call repeatedly (e.g.
     /// while dragging a slider) — each call replaces the previous target.
+    /// If the write itself is rejected (see `fanControlUnsupported`), manual
+    /// mode is never entered rather than showing a control that does
+    /// nothing.
     func setFanManualTarget(acKey: String, rpm: Double) {
         queue.async { [weak self] in
             guard let self, let control = self.fanControlDescriptors.first(where: { $0.acKey == acKey }) else { return }
             let clamped = min(max(rpm, control.minRPM), control.maxRPM)
+            guard self.writeFanTarget(control: control, rpm: clamped) else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.fanControlUnsupported = true
+                    self?.fanManualTargets.removeValue(forKey: acKey)
+                }
+                return
+            }
             self.activeManualFanTargets[acKey] = clamped
-            self.writeFanTarget(control: control, rpm: clamped)
             DispatchQueue.main.async { [weak self] in
                 self?.fanManualTargets[acKey] = clamped
             }
@@ -245,9 +268,18 @@ final class SensorStore: ObservableObject {
         }
     }
 
-    private func writeFanTarget(control: FanControlState, rpm: Double) {
-        guard let bytes = encodeSMCValue(rpm, dataType: control.dataType) else { return }
-        try? smc.writeRaw(forCode: fourCharCode(from: control.targetKey), bytes: bytes)
+    /// Returns false if the write was rejected — confirmed empirically to
+    /// happen with kIOReturnNotPrivileged on current macOS for an
+    /// unprivileged, unentitled process, even though reads are unrestricted.
+    @discardableResult
+    private func writeFanTarget(control: FanControlState, rpm: Double) -> Bool {
+        guard let bytes = encodeSMCValue(rpm, dataType: control.dataType) else { return false }
+        do {
+            try smc.writeRaw(forCode: fourCharCode(from: control.targetKey), bytes: bytes)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Enumerates this Mac's fans via "FNum", then keeps only the ones whose
