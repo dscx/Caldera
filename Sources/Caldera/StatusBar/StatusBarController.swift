@@ -145,8 +145,8 @@ final class StatusBarController: NSObject {
     /// stays neutral and just bigger, closer to a standard menu bar glyph's
     /// size instead of matching the small value-text size it used to share.
     private func attributedText(for entry: MenuBarEntry) -> NSAttributedString {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
-        let iconFont = NSFont.systemFont(ofSize: 15, weight: .regular)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        let iconFont = NSFont.systemFont(ofSize: 17, weight: .regular)
         let severityColor = entry.severity.nsColor
         let result = NSMutableAttributedString()
 
@@ -155,11 +155,11 @@ final class StatusBarController: NSObject {
             result.append(NSAttributedString(string: "\(glyph) ", attributes: [.font: iconFont]))
         case .symbol(let name):
             let attachment = NSTextAttachment()
-            let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+            let config = NSImage.SymbolConfiguration(pointSize: 17, weight: .medium)
             let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
             image?.isTemplate = true
             attachment.image = image
-            attachment.bounds = CGRect(x: 0, y: -4, width: 17, height: 17)
+            attachment.bounds = CGRect(x: 0, y: -5, width: 19, height: 19)
             result.append(NSAttributedString(attachment: attachment))
             result.append(NSAttributedString(string: " ", attributes: [.font: font]))
         }
@@ -174,7 +174,7 @@ final class StatusBarController: NSObject {
     }
 
     private var entrySeparator: NSAttributedString {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         return NSAttributedString(string: " · ", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])
     }
 
