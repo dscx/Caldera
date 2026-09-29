@@ -137,26 +137,39 @@ final class StatusBarController: NSObject {
     /// menu bar's light/dark appearance the same way native icons do; only
     /// the value text carries the severity color, keeping the glyph itself
     /// neutral rather than fighting the system's own icon coloring.
+    /// The value text is always plain white — a severity color there fought
+    /// the menu bar's own light/dark contrast handling and got hard to read.
+    /// Heat still shows at a glance via a colored underline beneath the
+    /// value (only for warm/hot; a normal reading gets no underline at all,
+    /// so it stays visually quiet). The icon itself — emoji or SF Symbol —
+    /// stays neutral and just bigger, closer to a standard menu bar glyph's
+    /// size instead of matching the small value-text size it used to share.
     private func attributedText(for entry: MenuBarEntry) -> NSAttributedString {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
-        let color = entry.severity.nsColor
+        let iconFont = NSFont.systemFont(ofSize: 15, weight: .regular)
+        let severityColor = entry.severity.nsColor
         let result = NSMutableAttributedString()
 
         switch entry.icon {
         case .emoji(let glyph):
-            result.append(NSAttributedString(string: "\(glyph) ", attributes: [.font: font, .foregroundColor: color]))
+            result.append(NSAttributedString(string: "\(glyph) ", attributes: [.font: iconFont]))
         case .symbol(let name):
             let attachment = NSTextAttachment()
-            let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+            let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
             let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
             image?.isTemplate = true
             attachment.image = image
-            attachment.bounds = CGRect(x: 0, y: -3, width: 13, height: 13)
+            attachment.bounds = CGRect(x: 0, y: -4, width: 17, height: 17)
             result.append(NSAttributedString(attachment: attachment))
             result.append(NSAttributedString(string: " ", attributes: [.font: font]))
         }
 
-        result.append(NSAttributedString(string: entry.valueText, attributes: [.font: font, .foregroundColor: color]))
+        var valueAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        if entry.severity.rank > 0 {
+            valueAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            valueAttributes[.underlineColor] = severityColor
+        }
+        result.append(NSAttributedString(string: entry.valueText, attributes: valueAttributes))
         return result
     }
 
